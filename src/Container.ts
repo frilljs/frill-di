@@ -1,8 +1,9 @@
+import MapLike from "./MapLike";
+
 /**
  * I/F and types
  */
 
-import MapLike from "./MapLike";
 export type ConstructorFunction<T> = {
   new (...args: any[]): T,
   // name: string,
