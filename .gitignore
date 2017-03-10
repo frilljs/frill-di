@@ -2,7 +2,7 @@ dist/
 node_modules/
 .DS_Store
 *.log
-.idea/
+.idea/**/*
 
 src/**/*.js
 src/**/*.d.ts
