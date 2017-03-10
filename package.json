@@ -1,0 +1,20 @@
+{
+  "name": "frill-di",
+  "version": "0.0.1",
+  "description": "Useful DI container for JavaScript/TypeScript",
+  "main": "index.js",
+  "repository": "git@github.com:frilljs/frill-di.git",
+  "author": "nanopx <0nanopx@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "test": "mocha --compilers ts:espower-typescript/guess test/**/*.ts"
+  },
+  "devDependencies": {
+    "@types/mocha": "^2.2.39",
+    "@types/power-assert": "^1.4.29",
+    "espower-typescript": "^8.0.0",
+    "mocha": "^3.2.0",
+    "power-assert": "^1.4.2"
+  },
+  "dependencies": {}
+}

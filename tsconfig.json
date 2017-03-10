@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "./dist",
+    "target": "es6",
+//    "lib": [ "es2017" ],
+    "experimentalDecorators": true,
+    "moduleResolution": "node",
+    "declaration": true,
+//    "skipLibCheck": false,
+    "sourceMap": true,
+//    "noImplicitAny": true,
+//    "strictNullChecks": true,
+//    "noFallthroughCasesInSwitch": true,
+//    "noImplicitReturns": true,
+//    "noImplicitThis": true,
+//    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

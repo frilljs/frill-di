@@ -1,0 +1,12 @@
+dist/
+node_modules/
+.DS_Store
+*.log
+.idea/
+
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+test/**/*.js
+test/**/*.d.ts
+test/**/*.js.map
