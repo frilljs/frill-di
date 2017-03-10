@@ -5,8 +5,9 @@ import MapLike from "./MapLike";
  */
 
 export type ConstructorFunction<T> = {
-  new (...args: any[]): T,
-  // name: string,
+  new (...args: any[]): T;
+  name?: string;
+  [key: string]: any;
 };
 
 export interface ClassType<T> {
@@ -15,16 +16,16 @@ export interface ClassType<T> {
 }
 
 export interface DependencyHandler extends ClassType<any> {
-  getInstance: () => any,
+  getInstance: () => any;
 }
 
 export interface PropertyHandler extends ClassType<any> {
-  propertyName: string,
-  target: ClassType<any>,
+  propertyName: string;
+  target: ClassType<any>;
 }
 
 export interface SingletonHandler extends ClassType<any> {
-  instance: any,
+  instance: any;
 }
 
 /**
@@ -103,7 +104,7 @@ export default class Container {
     if (typeof typeOrName === 'string') {
       name = typeOrName;
     } else {
-      name = typeOrName.name;
+      name = typeOrName.name as string;
       type = typeOrName;
     }
 
@@ -118,15 +119,20 @@ export default class Container {
    * Set a new dependency class
    * @param type
    */
-  private static setDependency<T>(type: ConstructorFunction<T>);
-  private static setDependency<T>(name: string, type: ConstructorFunction<T>);
-  private static setDependency<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>) {
-    const classType = this._resolveClassType(typeOrName, type);
-    this._setDependencyHandler({
-      ...classType,
+  private static setDependency<T>(type: ConstructorFunction<T>): void;
+  private static setDependency<T>(name: string, type: ConstructorFunction<T>): void;
+  private static setDependency<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>): void {
+    const { name, type: Type } = this._resolveClassType(typeOrName, type);
 
+    if (!Type) {
+      throw new TypeError(`Cannot find dependency class to instantiate for ${name}`);
+    }
+
+    this._setDependencyHandler({
+      name,
+      type: Type,
       // gets called each time we get() the class
-      getInstance: () => new type(),
+      getInstance: () => new Type(),
     });
   }
 
@@ -134,19 +140,23 @@ export default class Container {
    * Set a new singleton class
    * @param type
    */
-  private static setSingleton<T>(type: ConstructorFunction<T>);
-  private static setSingleton<T>(name: string, type: ConstructorFunction<T>);
-  private static setSingleton<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>) {
-    const classType = this._resolveClassType(typeOrName, type);
+  private static setSingleton<T>(type: ConstructorFunction<T>): void;
+  private static setSingleton<T>(name: string, type: ConstructorFunction<T>): void;
+  private static setSingleton<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>): void {
+    const { name, type: Type } = this._resolveClassType(typeOrName, type);
+
+    if (!Type) {
+      throw new TypeError(`Cannot find singleton class to instantiate for ${name}`);
+    }
 
     // type should be defined as a singleton
-    this.defineSingletonClass(classType.type);
+    this.defineSingletonClass(Type);
 
     this._setSingletonHandler({
-      ...classType,
-
+      name,
+      type: Type,
       // singleton instance
-      instance: new type(),
+      instance: new Type(),
     });
   }
 
@@ -154,14 +164,19 @@ export default class Container {
    * Set a dependency/singleton to the container
    * @param type
    */
-  static set<T>(type: ConstructorFunction<T>);
-  static set<T>(name: string, type: ConstructorFunction<T>);
-  static set<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>) {
-    const classType = this._resolveClassType(typeOrName, type);
-    if (this.isSingletonClass(classType.type)) {
-      this.setSingleton(classType.name, classType.type);
+  static set<T>(type: ConstructorFunction<T>): void;
+  static set<T>(name: string, type: ConstructorFunction<T>): void;
+  static set<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>): void {
+    const { name, type: Type } = this._resolveClassType(typeOrName, type);
+
+    if (!Type) {
+      throw new TypeError(`Cannot find class to set for ${name}`);
+    }
+
+    if (this.isSingletonClass(Type)) {
+      this.setSingleton(name, Type);
     } else {
-      this.setDependency(classType.name, classType.type);
+      this.setDependency(name, Type);
     }
   }
 
@@ -226,6 +241,8 @@ export default class Container {
   static remove<T>(typeOrName: ConstructorFunction<T> | string): boolean {
     const { name } = this._resolveClassType(typeOrName);
 
+    // TODO: remove properties
+
     if (this.hasSingleton(name)) {
       return this._singletonHandlers.delete(name);
     }
@@ -234,7 +251,7 @@ export default class Container {
       return this._dependencyHandlers.delete(name);
     }
 
-    // TODO: remove properties
+    return false;
   }
 
   static defineDependentProperty<T>(type: ConstructorFunction<T>, propertyName: string, targetType: ConstructorFunction<T>) {
@@ -252,6 +269,9 @@ export default class Container {
     });
   }
 
+  /**
+   * Flush all the dependency instances/singleton instances/properties
+   */
   static flushAll() {
     this._dependencyHandlers.clear();
     this._singletonHandlers.clear();
@@ -273,7 +293,6 @@ export default class Container {
   //   });
   // }
 
-
   /**
    * Get the resolved instance of a class
    * @param typeOrName
@@ -290,15 +309,19 @@ export default class Container {
     }
 
     if (!classExists) {
-      this.set(name, type);
+      this.set(name, type as ConstructorFunction<T>);
     }
 
     if (this.hasSingleton(name)) {
-      return this._singletonHandlers.get(name).instance;
+      return (this._singletonHandlers.get(name) as SingletonHandler).instance;
     }
 
     if (this.hasDependency(name)) {
-      return this._dependencyHandlers.get(name).getInstance();
+      return (this._dependencyHandlers.get(name) as DependencyHandler).getInstance();
     }
+
+    throw new TypeError(
+      `Cannot get instance for ${name}, you should do Container.get(Class) or Container.get('name', Class)`
+    );
   }
 }

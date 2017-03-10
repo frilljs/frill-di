@@ -35,7 +35,7 @@ describe('Container', function() {
   describe('#set()', function() {
     it('should be able to set dependency', function() {
       Container.set(TestClass);
-      const test = Container.get(TestClass);
+      const test = Container.get<TestClass>(TestClass);
       assert(test.name === 'default name');
     });
 

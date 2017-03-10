@@ -11,7 +11,7 @@ export default class MapLike<K,V> {
   /**
    * The actual map
    */
-  private _map;
+  private _map: { [key: string]: V | null };
 
   /**
    * Number of entries in this map
@@ -38,7 +38,7 @@ export default class MapLike<K,V> {
    * Get the values of the map
    * @return {any[]}
    */
-  values(): V[] {
+  values(): (V | null)[] {
     return this.keys().map((key) => this._map[key]);
   }
 
@@ -47,7 +47,7 @@ export default class MapLike<K,V> {
    * @param key
    * @return {any}
    */
-  get(key: K): V {
+  get(key: string): V | null {
     return this._map[key];
   }
 
@@ -56,7 +56,7 @@ export default class MapLike<K,V> {
    * @param key
    * @return {boolean}
    */
-  has(key: K): boolean {
+  has(key: string): boolean {
     return this._map[key] !== null || this._map[key] !== undefined;
   }
 
@@ -65,7 +65,7 @@ export default class MapLike<K,V> {
    * @param key
    * @param value
    */
-  set(key: K, value: V): MapLike<K,V> {
+  set(key: string, value: V): MapLike<K,V> {
     this._map[key] = value;
     return this;
   }
@@ -74,7 +74,7 @@ export default class MapLike<K,V> {
    * Delete the entry by key
    * @param key
    */
-  delete(key: K): boolean {
+  delete(key: string): boolean {
     if (!this.has(key)) {
       return false;
     }
