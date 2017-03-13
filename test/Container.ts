@@ -1,12 +1,10 @@
 import * as assert from 'power-assert';
 import Container from '../src/Container';
-import Singleton from "../src/decorators/Singleton";
 
 class TestClass {
   name: string = 'default name';
 }
 
-@Singleton()
 class TestSingletonClass {
   name: string = 'default name';
 }
@@ -14,6 +12,12 @@ class TestSingletonClass {
 class ClassWhichDoesNotExistInContainer {}
 
 describe('Container', function() {
+  describe('#defineSingletonClass()', function() {
+    it('should be able to define a singleton class', function() {
+      assert.doesNotThrow(() => Container.defineSingletonClass(TestSingletonClass));
+    });
+  });
+
   describe('#isSingletonClass()', function() {
     it('should be able to determine if a class is singleton', function() {
       assert(Container.isSingletonClass(TestSingletonClass) === true);
@@ -21,14 +25,6 @@ describe('Container', function() {
 
     it('should return false when a class is not a singleton', function() {
       assert(Container.isSingletonClass(TestClass) === false);
-    });
-  });
-
-  describe('#defineSingletonClass()', function() {
-    it('should be able to define a singleton class', function() {
-      class AnotherDummyClass {}
-      Container.defineSingletonClass(AnotherDummyClass);
-      assert(Container.isSingletonClass(AnotherDummyClass));
     });
   });
 
@@ -157,11 +153,22 @@ describe('Container', function() {
       assert(Container.hasDependency(ClassWhichDoesNotExistInContainer));
       assert(Container.remove(ClassWhichDoesNotExistInContainer) === true);
       assert(Container.has(ClassWhichDoesNotExistInContainer) === false);
-    })
+      assert(Container.remove(TestClass) === true);
+      assert(Container.remove(TestSingletonClass) === true);
+    });
 
     it('should be able to remove a dependency by name', function() {
-      Container.set('RemoveMe', ClassWhichDoesNotExistInContainer);
-      assert(Container.remove('RemoveMe') === true);
+      assert(Container.remove('NamedClass') === true);
+      assert(Container.remove('NamedSingletonClass') === true);
     });
   });
+
+  // describe('#flushAll()', function() {
+  //   it('should be able to flush everything in the container', function() {
+  //     Container.flushAll();
+  //     assert(Container.has(TestClass) === false);
+  //     assert(Container.has('TestClass') === false);
+  //     assert(Container.has('NamedClass') === false);
+  //   });
+  // });
 });

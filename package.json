@@ -7,7 +7,7 @@
   "author": "nanopx <0nanopx@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "test": "mocha --compilers ts:espower-typescript/guess test/**/*.ts"
+    "test": "mocha --compilers ts:espower-typescript/guess test/*.ts test/**/*.ts"
   },
   "devDependencies": {
     "@types/mocha": "^2.2.39",
