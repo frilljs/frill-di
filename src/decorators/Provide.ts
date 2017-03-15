@@ -1,11 +1,10 @@
-import {ConstructorFunction, default as Container} from "../Container";
+import {Container, ConstructorType, DependencyOptions} from "../Container";
 
-export default function Provide<T>(name?: string) {
-  return (type: ConstructorFunction<T>) => {
-    if (name !== undefined) {
-      Container.set(name, type);
-    } else {
-      Container.set(type);
+export function Provide<T>(options?: string | DependencyOptions) {
+  return (type: ConstructorType<T>) => {
+    if (typeof options === 'string') {
+      options = { name: options };
     }
+    Container.set(type, options);
   };
 }

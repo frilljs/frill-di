@@ -1,20 +1,37 @@
 {
   "name": "frill-di",
   "version": "0.0.1",
-  "description": "Useful DI container for JavaScript/TypeScript",
-  "main": "index.js",
+  "description": "Painless DI container for JavaScript/TypeScript",
+  "main": "lib/index.js",
   "repository": "git@github.com:frilljs/frill-di.git",
   "author": "nanopx <0nanopx@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "test": "mocha --compilers ts:espower-typescript/guess test/*.ts test/**/*.ts"
+    "clean": "rimraf '*.js' '*.js.map' '*.d.ts' '.tmp' 'lib'",
+    "prebuild": "run-s clean",
+    "build": "run-s build:*",
+    "build:ts": "tsc",
+    "copy": "run-p copy:*",
+    "copy:dts": "cpx '.tmp/src/**/*.d.ts' 'lib/'",
+    "predist": "run-s build:ts",
+    "dist": "babel .tmp/src/ -d lib/ && npm run copy:dts",
+    "prepublish": "npm-s dist",
+    "test": "run-s test:*",
+    "pretest:js": "run-s build:ts",
+    "test:js": "ava '.tmp/test/**/*.js'",
+    "watch": "run-p -c watch:*",
+    "watch:ts": "run-s -c 'build:ts -- --watch'",
+    "watch:test": "run-s -c 'test:js -- -w'"
   },
   "devDependencies": {
-    "@types/mocha": "^2.2.39",
-    "@types/power-assert": "^1.4.29",
-    "espower-typescript": "^8.0.0",
-    "mocha": "^3.2.0",
-    "power-assert": "^1.4.2"
+    "ava": "^0.18.2",
+    "babel-cli": "^6.24.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-preset-es2015": "^6.24.0",
+    "cpx": "^1.5.0",
+    "npm-run-all": "^4.0.2",
+    "rimraf": "^2.6.1",
+    "typescript": "^2.2.1"
   },
   "dependencies": {}
 }

@@ -1,368 +1,286 @@
-import MapLike from "./MapLike";
-
 /**
  * I/F and types
  */
 
-export type ConstructorFunction<T> = {
-  new (...args: Array<any>): T;
-  name?: string;
+
+export type ConstructorType<T> = {
+  new (...args: any[]): T;
   [key: string]: any;
 }
 
-export interface ClassType<T> {
+export type ConstructorTypeOrName<T> = ConstructorType<T> | string;
+
+export interface PropertyDependencyHandlers {
+  [propertyName: string]: ConstructorTypeOrName<any>;
+}
+
+export interface DependencyOptions {
+  name?: string;
+  inject?: ConstructorTypeOrName<any>[];
+  injectProperties?: PropertyDependencyHandlers;
+  singleton?: boolean;
+}
+
+export interface DependencyHandler<T> {
   name: string;
-  type?: ConstructorFunction<T>;
+  type: ConstructorType<T>;
+  inject: ConstructorType<any>[];
+  injectProperties: PropertyDependencyHandlers;
+  singleton: boolean;
+  getInstance: () => T;
 }
-
-export interface DependencyHandler extends ClassType<any> {
-  getInstance: () => any;
-}
-
-export interface PropertyHandler extends ClassType<any> {
-  propertyName: string;
-  targetType: ConstructorFunction<any>;
-}
-
-export interface SingletonHandler extends ClassType<any> {
-  instance: any;
-}
-
-/**
- * Key to identify singleton class
- */
-const SINGLETON_CLASS = '__SINGLETON_CLASS__';
-// const SINGLETON_CLASS = Symbol('__SINGLETON_CLASS__');
-
-/**
- * Key to identify injected property
- */
-const INJECTED_PROPERTIES = '__INJECTED_PROPERTIES__';
-// const INJECTED_PROPERTY = Symbol('__INJECTED__');
 
 /**
  * Container
  *
  * An IoC container.
  */
-export default class Container {
+export class Container {
   /**
    * Map of dependencies
-   * @type {MapLike<string, DependencyHandler>}
+   * @type {Map<ConstructorType<any>, DependencyHandler<any>>}
    * @private
    */
-  private static _dependencyHandlers = new MapLike<string, DependencyHandler>();
-  // private static _dependencyHandlers = new Map<string, DependencyHandler>();
+  private static _dependencies = new Map<ConstructorType<any>, DependencyHandler<any>>();
 
   /**
-   * Map of properties which has dependencies to resolve
-   * The map key is the name of class which the property belongs to
-   * @type {MapLike<string, PropertyHandler>}
+   * Map of singleton instances
+   * @type {Map<ConstructorType<any>, any>}
    * @private
    */
-  private static _dependentPropertyHandlers = new MapLike<string, PropertyHandler>();
-  // private static _dependentPropertyHandlers = new Map<string, PropertyHandler>();
+  private static _singletonInstances = new Map<ConstructorType<any>, any>();
 
   /**
-   * Map of singletons
-   * @type {MapLike<string, SingletonHandler>}
-   * @private
-   */
-  private static _singletonHandlers = new MapLike<string, SingletonHandler>();
-  // private static _singletonHandlers = new Map<string, SingletonHandler>();
-
-  /**
-   * Set dependency handler
-   * @param handler
-   * @private
-   */
-  private static _setDependencyHandler(handler: DependencyHandler) {
-    this._dependencyHandlers.set(handler.name, handler);
-  }
-
-  /**
-   * Set singleton handler
-   * @param handler
-   * @private
-   */
-  private static _setSingletonHandler(handler: SingletonHandler) {
-    this._singletonHandlers.set(handler.name, handler);
-  }
-
-  /**
-   * Set the property dependency handler
-   * @param handler
-   * @private
-   */
-  private static _setDependentPropertyHandler(handler: PropertyHandler) {
-    this._dependentPropertyHandlers.set(handler.name, handler);
-  }
-
-  /**
-   * Resolve ClassType of a class or name
-   * @param typeOrName
+   * Resolve the name from the given type
    * @param type
-   * @return {{name: string, type: ConstructorFunction<T>}}
+   * @return {string}
    * @private
    */
-  private static _resolveClassType<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>): ClassType<T> | never {
-    let name: string;
+  private static _resolveName<T>(type: ConstructorType<T>) {
+    return type.name || type.constructor.name;
+  }
+
+  /**
+   * Get the name for the type/name
+   * @param typeOrName
+   * @return {string}
+   * @private
+   */
+  private static _getName<T>(typeOrName: ConstructorTypeOrName<T>): string {
     if (typeof typeOrName === 'string') {
-      name = typeOrName;
-    } else {
-      name = typeOrName.name as string || typeOrName.constructor.name as string;
-      type = typeOrName;
+      return typeOrName;
     }
 
-    if (!name) {
-      throw new Error(`Cannot detect the name of the class. Specify a valid a name for "${type}".`);
+    if (!this.has(typeOrName)) {
+      return this._resolveName<T>(typeOrName);
     }
 
-    return { name, type };
+    const handler = this._getDependencyHandler(typeOrName) as DependencyHandler<T>;
+    return handler.name;
   }
 
   /**
-   * Set a new dependent property
+   * Get the type for the type/name
    * @param typeOrName
-   * @param propertyName
-   * @param targetTypeOrName
+   * @return {any}
    * @private
    */
-  private static _setDependentProperty<T>(typeOrName: ConstructorFunction<T> | string, propertyName: string, targetTypeOrName: ConstructorFunction<T> | string) {
-    const classType = this._resolveClassType(typeOrName);
-    const { type: targetType } = this._resolveClassType(targetTypeOrName);
-
-    if (!this.has(classType.name)) {
-      this.set(classType.type as ConstructorFunction<T>);
+  private static _getType<T>(typeOrName: ConstructorTypeOrName<T>): ConstructorType<T> | undefined {
+    if (typeof typeOrName !== 'string') {
+      return typeOrName;
     }
 
-    // this._setDependentPropertyHandler({
-    //   ...classType,
-    //   propertyName,
-    //   targetType,
-    // });
+    const handler = this._getDependencyHandler<T>(typeOrName) as DependencyHandler<T>;
+    return handler ? handler.type : undefined;
   }
 
   /**
-   * Set a new dependency class
-   * @param type
+   * Get the dependency handler for the type/name
+   * @param typeOrName
+   * @return {any}
+   * @private
    */
-  private static _setDependency<T>(type: ConstructorFunction<T>): void;
-  private static _setDependency<T>(name: string, type: ConstructorFunction<T>): void;
-  private static _setDependency<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>): void {
-    const { name, type: Type } = this._resolveClassType(typeOrName, type);
+  private static _getDependencyHandler<T>(typeOrName: ConstructorTypeOrName<T>): DependencyHandler<T> | undefined {
+    let handler: DependencyHandler<T> | undefined;
 
-    if (!Type) {
-      throw new TypeError(`Cannot find dependency class to instantiate for ${name}`);
+    if (typeof typeOrName !== 'string') {
+      handler = this._dependencies.get(typeOrName);
+    } else {
+      this._dependencies.forEach((_handler) => {
+        if (_handler.name === typeOrName) {
+          handler = _handler;
+        }
+      });
     }
 
-    this._setDependencyHandler({
-      name,
-      type: Type,
-      // gets called each time we get() the class
-      getInstance: () => new Type(),
-    });
+    // if (!handler) {
+    //   throw new TypeError('Trying to get a dependency which is not set in container');
+    // }
+
+    return handler;
   }
 
   /**
-   * Set a new singleton class
+   * Set the dependency handler for the type
    * @param type
+   * @param handler
+   * @private
    */
-  private static _setSingleton<T>(type: ConstructorFunction<T>): void;
-  private static _setSingleton<T>(name: string, type: ConstructorFunction<T>): void;
-  private static _setSingleton<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>): void {
-    const { name, type: Type } = this._resolveClassType(typeOrName, type);
-
-    if (!Type) {
-      throw new TypeError(`Cannot find singleton class to instantiate for ${name}`);
-    }
-
-    // type should be defined as a singleton
-    this.defineSingletonClass(Type);
-
-    this._setSingletonHandler({
-      name,
-      type: Type,
-      // singleton instance
-      instance: new Type(),
-    });
+  private static _setDependencyHandler<T>(type: ConstructorType<T>, handler: DependencyHandler<T>): void {
+    this._dependencies.set(type, handler);
   }
 
-  private static setDependentProperty<T>(typeOrName: ConstructorFunction<T> | string, propertyName: string, targetTypeOrName: ConstructorFunction<T> | string) {
-    const { name, type } = this._resolveClassType(typeOrName);
-    // const { name: targetName, type: targetType } = this._resolveClassType(targetTypeOrName);
+  /**
+   * Set a property dependency for the given type
+   * @param type
+   * @param propertyName
+   * @param targetType
+   * @private
+   */
+  private static _setPropertyDependencyHandler<T>(type: ConstructorType<T>, propertyName: string, targetType: ConstructorTypeOrName<any>): void | never {
+    if (!this._dependencies.has(type)) {
+      throw new TypeError(`Trying to set a property dependency of ${type} which doesn't exist`);
+    }
 
-    this._setDependentPropertyHandler({
-      name,
-      type,
-      propertyName,
-      target: targetTypeOrName,
+    const handler = this._dependencies.get(type) as DependencyHandler<T>;
+    handler.injectProperties[propertyName] = targetType;
+  }
+
+  /**
+   * Injects the constructor dependencies to the given type
+   * @param type
+   * @param params
+   * @return {any}
+   * @private
+   */
+  private static _injectConstructor<T>(type: ConstructorType<T>, params: ConstructorTypeOrName<any>[]) {
+    return type.bind.apply(type, [type, ...params.map((param) => this.get(param))]);
+  }
+
+  /**
+   * Injects the property dependency
+   * @param type
+   * @param propertyName
+   * @param targetType
+   * @private
+   */
+  private static _injectProperty<T>(type: T, propertyName: string, targetType: ConstructorTypeOrName<any>) {
+    Object.defineProperty(type, propertyName, {
+      enumerable: true,
+      writable: false,
+      configurable: false,
+      value: this.get(targetType),
     })
   }
 
   /**
-   * Set a dependency/singleton to the container
+   * Resolve the dependencies for type, and returns the injected instance
    * @param type
+   * @private
    */
-  static set<T>(type: ConstructorFunction<T>): void;
-  static set<T>(name: string, type: ConstructorFunction<T>): void;
-  static set<T>(typeOrName: ConstructorFunction<T> | string, type?: ConstructorFunction<T>): void {
-    const { name, type: Type } = this._resolveClassType(typeOrName, type);
+  private static _resolve<T>(type: ConstructorType<T>): T {
+    const handler = this._getDependencyHandler(type) as DependencyHandler<T>;
+    const Type = this._injectConstructor(handler.type, handler.inject);
+    const instance = new Type();
 
-    if (!Type) {
-      throw new TypeError(`Cannot find class to set for ${name}`);
+    if (Object.keys(handler.injectProperties).length) {
+      // Class property injection
+      const injectProperties = handler.injectProperties;
+      Object.keys(injectProperties).forEach((propertyName) => {
+        const value = injectProperties[propertyName];
+        this._injectProperty(instance, propertyName, value);
+      });
     }
 
-    // TODO: handle dependent properties
-
-    if (this.isSingletonClass(Type)) {
-      this._setSingleton(name, Type);
-    } else {
-      this._setDependency(name, Type);
-    }
+    return instance;
   }
 
   /**
-   * Check if a given class property is defined as a dependent property
+   * Create the dependency handler
    * @param type
-   * @param propertyName
+   * @param options
+   * @return {DependencyHandler<T>}
+   * @private
+   */
+  private static _createDependencyHandler<T>(type: ConstructorType<T>, options: DependencyOptions): DependencyHandler<T> {
+    return Object.assign({
+      name: this._getName(type),
+      type,
+      inject: [],
+      injectProperties: {},
+      singleton: false,
+      getInstance: () => this._resolve<T>(type)
+    }, options);
+  }
+
+  /**
+   * Get the singleton instance for type
+   * @param type
    * @return {any}
+   * @private
    */
-  static isDependentProperty<T>(type: ConstructorFunction<T>, propertyName: string) : boolean {
-    const dependentProperties = type[INJECTED_PROPERTIES];
-    if (!dependentProperties) {
-      return false;
+  private static _getSingletonInstance<T>(type: ConstructorType<T>): T | undefined {
+    if (!this.has(type)) {
+      return;
     }
-    return !!dependentProperties[propertyName];
-  }
 
-  /**
-   * Check if a class has any dependent properties
-   * @param type
-   * @return {Boolean}
-   */
-  static hasDependentProperty<T>(type: ConstructorFunction<T>) : boolean {
-    // TODO: check from container
-    return Boolean(type[INJECTED_PROPERTIES]);
-  }
+    const handler = this._getDependencyHandler(type) as DependencyHandler<T>;
+    if (!handler.singleton) {
+      return;
+    }
 
-  /**
-   * Check if a given class is defined as a singleton class
-   * @param type
-   * @return {Boolean}
-   */
-  static isSingletonClass<T>(type: ConstructorFunction<T>) {
-    return Boolean(type[SINGLETON_CLASS]);
-  }
-
-  /**
-   * Check if the given name/class is a singleton managed by the container
-   * @param typeOrName
-   * @return {boolean}
-   */
-  static hasSingleton<T>(typeOrName: ConstructorFunction<T> | string): boolean {
-    const { name } = this._resolveClassType(typeOrName);
-    return this._singletonHandlers.has(name);
-  }
-
-  /**
-   * Check if the given name/class is a dependency managed by the container
-   * @param typeOrName
-   * @return {boolean}
-   */
-  static hasDependency<T>(typeOrName: ConstructorFunction<T> | string): boolean {
-    const { name } = this._resolveClassType(typeOrName);
-    return this._dependencyHandlers.has(name);
+    if (!this._singletonInstances.has(handler.type)) {
+      const instance = handler.getInstance();
+      this._singletonInstances.set(handler.type, instance);
+      return instance;
+    }
+    return this._singletonInstances.get(handler.type) as T;
   }
 
   /**
    * Check if the given name/class is managed by the container
    * @param typeOrName
    */
-  static has<T>(typeOrName: ConstructorFunction<T> | string): boolean {
-    return this.hasDependency(typeOrName) || this.hasSingleton(typeOrName);
-  }
+  public static has<T>(typeOrName: ConstructorTypeOrName<T>): boolean {
+    let type: ConstructorType<T> | undefined;
 
-  /**
-   * Define a property to a class, to identify if the class has to be a singleton
-   * @param type
-   */
-  static defineSingletonClass<T>(type: ConstructorFunction<T>) {
-    // Do nothing if the type is already defined as a singleton
-    if (!this.isSingletonClass(type)) {
-      Object.defineProperty(type, SINGLETON_CLASS, {
-        value: true,
-        writable: false,
-        configurable: false,
-        enumerable: true,
-      });
+    if (typeof typeOrName === 'string') {
+      type = this._getType<T>(typeOrName);
+    } else {
+      type = typeOrName;
     }
+
+    if (type === undefined) {
+      return false;
+    }
+
+    return this._dependencies.has(type);
   }
 
+  // public static isSingleton<T>(typeOrName: ConstructorTypeOrName<T>): boolean {}
+
   /**
-   * Define a dependent property
+   * Set a property dependency for type
    * @param type
    * @param propertyName
    * @param targetType
    */
-  static defineDependentProperty<T>(type: ConstructorFunction<T>, propertyName: string, targetTypeOrName: ConstructorFunction<T> | string) {
-    // Do nothing if property is already defined
-    if (!this.isDependentProperty(type, propertyName)) {
-      const dependentProperties = type[INJECTED_PROPERTIES] || {};
-      dependentProperties[propertyName] = targetTypeOrName;
-
-      Object.defineProperty(type, INJECTED_PROPERTIES, {
-        value: dependentProperties,
-        writable: false,
-        configurable: false,
-        enumerable: true,
-      });
-    }
+  public static setPropertyDependency<T>(type: ConstructorType<T>, propertyName: string, targetType: ConstructorTypeOrName<any>): void {
+    this._setPropertyDependencyHandler<T>(type, propertyName, targetType);
   }
 
   /**
-   * Remove the given name/class from the container
-   * @param typeOrName
-   * @return {boolean}
+   * Set a dependency/singleton to the container
+   * @param type
+   * @param params
    */
-  static remove<T>(typeOrName: ConstructorFunction<T> | string): boolean {
-    const { name } = this._resolveClassType(typeOrName);
-
-    // TODO: remove properties
-
-    if (this.hasSingleton(name)) {
-      return this._singletonHandlers.delete(name);
+  public static set<T>(type: ConstructorType<T>, dependencyOptions: DependencyOptions = {}): void {
+    if (this.has(type)) {
+      return;
     }
 
-    if (this.hasDependency(name)) {
-      return this._dependencyHandlers.delete(name);
-    }
-
-    return false;
-  }
-
-  // /**
-  //  * Flush all the dependency instances/singleton instances/properties
-  //  */
-  // static flushAll() {
-  //   this._dependencyHandlers.clear();
-  //   this._singletonHandlers.clear();
-  //   this._dependentPropertyHandlers.clear();
-  // }
-
-  static dependencyKeys(): Array<string> {
-    return this._dependencyHandlers.keys();
-  }
-
-  static singletonKeys(): Array<string> {
-    return this._singletonHandlers.keys();
-  }
-
-  static keys(): Array<string> {
-    return [
-      ...this.dependencyKeys(),
-      ...this.singletonKeys(),
-    ];
+    const handler = this._createDependencyHandler(type, dependencyOptions);
+    this._setDependencyHandler(type, handler);
   }
 
   /**
@@ -370,30 +288,40 @@ export default class Container {
    * @param typeOrName
    * @return {any}
    */
-  static get<T>(typeOrName: ConstructorFunction<T> | string): T | never {
-    const { name, type } = this._resolveClassType(typeOrName);
-    const classExists = this.has(name);
-
-    if (!classExists && type === undefined) {
-      throw new TypeError(
-        `Cannot get instance for ${name}, you should do Container.get(Class) or Container.get('name', Class)`
-      );
+  public static get<T>(typeOrName: ConstructorTypeOrName<T>): T | never {
+    if (!this.has(typeOrName)) {
+      if (typeof typeOrName === 'function') {
+        this.set<T>(typeOrName, {});
+      } else {
+        throw new TypeError(`Trying to get a named dependency "${typeOrName}", which is not in the container`);
+      }
     }
 
-    if (!classExists) {
-      this.set(name, type as ConstructorFunction<T>);
+    const handler = this._getDependencyHandler(typeOrName) as DependencyHandler<T>;
+    const instance: T = handler.getInstance();
+
+    if (handler.singleton) {
+      return this._getSingletonInstance(handler.type) as T;
     }
 
-    if (this.hasSingleton(name)) {
-      return (this._singletonHandlers.get(name) as SingletonHandler).instance;
-    }
+    return instance;
+  }
 
-    if (this.hasDependency(name)) {
-      return (this._dependencyHandlers.get(name) as DependencyHandler).getInstance();
-    }
+  /**
+   * Remove the given name/class from the container
+   * @param typeOrName
+   * @return {boolean}
+   */
+  public static remove<T>(typeOrName: ConstructorTypeOrName<T>): boolean {
+    const type = this._getType(typeOrName);
+    if (!type) return false;
+    return this._dependencies.delete(type);
+  }
 
-    throw new TypeError(
-      `Cannot get instance for ${name}, you should do Container.get(Class) or Container.get('name', Class)`
-    );
+  /**
+   * Flush all the dependency instances/singleton instances/properties
+   */
+  public static flush(): void {
+    this._dependencies.clear();
   }
 }

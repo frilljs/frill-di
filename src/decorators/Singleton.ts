@@ -1,14 +1,14 @@
-import {ConstructorFunction, default as Container} from "../Container";
+import {ConstructorType, Container, DependencyOptions} from "../Container";
 
-export default function Singleton<T>(name?: string) {
-  return (type: ConstructorFunction<T>) => {
-    // Tell the container that this type is a singleton
-    Container.defineSingletonClass(type);
-
-    if (name !== undefined) {
-      Container.set(name, type);
-    } else {
-      Container.set(type);
+export function Singleton<T>(options: string | DependencyOptions = {}) {
+  return (type: ConstructorType<T>) => {
+    if (typeof options === 'string') {
+      options = {name: options};
     }
+
+    // Always singleton if this decorator is used
+    options.singleton = true;
+
+    Container.set(type, options);
   };
 }

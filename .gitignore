@@ -1,9 +1,9 @@
-dist/
 node_modules/
 .DS_Store
 *.log
 .idea/**/*
-
+.tmp/
+lib/
 src/**/*.js
 src/**/*.d.ts
 src/**/*.js.map

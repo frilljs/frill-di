@@ -1,7 +1,16 @@
-import {ConstructorFunction, default as Container} from "../Container";
+import {Container, ConstructorTypeOrName} from "../Container";
 
-export default function Inject<T>(targetTypeOrName: ConstructorFunction<T> | string) {
-  return (type: any, propertyName: string) => {
-    Container.defineDependentProperty(type, propertyName, targetTypeOrName);
+export function Inject<T>(targetType: ConstructorTypeOrName<any>, ...targetTypes: ConstructorTypeOrName<any>[]) {
+  return (type: any, propertyName?: string) => {
+    if (propertyName !== undefined) {
+      // Property Injection
+      Container.setPropertyDependency<T>(type, propertyName, targetType);
+    } else {
+      // Constructor injection
+      Container.set<T>(type, {
+        inject: [ targetType, ...targetTypes ],
+      });
+    }
   };
+
 }
