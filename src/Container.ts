@@ -319,9 +319,10 @@ export class Container {
   }
 
   /**
-   * Flush all the dependency instances/singleton instances/properties
+   * Flush everything inside the container
    */
   public static flush(): void {
     this._dependencies.clear();
+    this._singletonInstances.clear();
   }
 }
