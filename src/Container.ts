@@ -284,6 +284,17 @@ export class Container {
   }
 
   /**
+   * Provide a set of dependencies to the container
+   * @param options
+   */
+  public static provide(options: (DependencyOptions & { type: ConstructorType<any> })[]) {
+    options.forEach((option) => {
+      const { type } = option;
+      this.set(type, option);
+    });
+  }
+
+  /**
    * Get the resolved instance of a class
    * @param typeOrName
    * @return {any}
