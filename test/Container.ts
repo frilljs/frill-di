@@ -72,9 +72,9 @@ test('should be able to set and remove a named dependency', (t) => {
 });
 
 test('should be able to get a dependency which is not set', (t) => {
-  class A2 {}
-  t.true(Container.get(A2) instanceof A2);
-  t.true(Container.has(A2));
+  class SomeClass {}
+  t.true(Container.get(SomeClass) instanceof SomeClass);
+  t.true(Container.has(SomeClass));
 });
 
 test('should return a new instance for normal dependencies', (t) => {
@@ -131,7 +131,7 @@ test('should be able to add property injection dynamically', (t) => {
   t.true(c2.b instanceof B);
 });
 
-test('should be able to set a class property dependency for singleton', (t) => {
+test('should properly handle a injected class property in a singleton', (t) => {
   Container.set(A);
   Container.set(B, { singleton: true });
   Container.setPropertyDependency(B, 'a', A);
@@ -143,11 +143,23 @@ test('should be able to set a class property dependency for singleton', (t) => {
   t.not(b.a, Container.get(A));
 });
 
-test('should be able to inject into constructor arguments', (t) => {
+test('should properly handle singleton injected in a property', (t) => {
+  Container.set(B, { singleton: true });
+  Container.set(C, { injectProperties: { a: A, b: B } });
+  const c = Container.get(C);
+
+  // C is not a singleton
+  t.not(c, Container.get(C));
+  // B is a singleton
+  t.is(c.b, Container.get(C).b);
+});
+
+test('should be able to handle constructor injection', (t) => {
+  // Same as new C(new A(), new B()), except all dependencies of A, B, C is resolved by the container
   Container.set(C, { inject: [ A, B ] });
-  const instance = Container.get(C);
-  t.true(instance.a instanceof A);
-  t.true(instance.b instanceof B);
+  const c = Container.get(C);
+  t.true(c.a instanceof A);
+  t.true(c.b instanceof B);
 });
 
 test.todo('should throw on circular reference of dependencies');
