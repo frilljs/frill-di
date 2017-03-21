@@ -12,5 +12,4 @@ export function Inject<T>(targetType: ConstructorTypeOrName<any>, ...targetTypes
       });
     }
   };
-
 }

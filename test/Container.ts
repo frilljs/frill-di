@@ -141,6 +141,8 @@ test('should properly handle a injected class property in a singleton', (t) => {
   t.is(b, Container.get(B));
   t.is(b.a, Container.get(B).a);
   t.not(b.a, Container.get(A));
+  t.false(Container.isSingleton(A));
+  t.true(Container.isSingleton(B));
 });
 
 test('should properly handle singleton injected in a property', (t) => {
@@ -162,6 +164,4 @@ test('should be able to handle constructor injection', (t) => {
   t.true(c.b instanceof B);
 });
 
-test.todo('should throw on circular reference of dependencies');
-
-
+test.todo('should throw or handle circular reference of dependencies');
